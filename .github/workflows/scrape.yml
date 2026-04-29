@@ -1,0 +1,66 @@
+name: OJAS Job Scraper
+
+on:
+  # ── Twice-weekly schedule: Tuesday & Friday at 9:30 AM IST (04:00 UTC) ──────
+  schedule:
+    - cron: '0 4 * * 2,5'   # UTC 04:00 = IST 09:30 | runs Tue (2) & Fri (5)
+
+  # ── Run on push to master ───────────────────────────────────────────────────
+  push:
+    branches: [ master ]
+
+  # ── Manual trigger from GitHub Actions tab ───────────────────────────────────
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run — scrape but do NOT write to database'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  scrape:
+    name: Scrape OJAS & Update DB
+    runs-on: ubuntu-latest
+    timeout-minutes: 30        # Kill if stuck (Playwright hangs, API timeouts, etc.)
+
+    steps:
+      # 1. Checkout source code
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Node.js with npm cache
+      - name: 🟢 Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. Install npm dependencies
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      # 4. Install Chromium for Playwright
+      #    Only installs Chromium (not Firefox/WebKit) to keep the runner fast
+      - name: 🎭 Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # 5. Run the scraper
+      - name: 🔍 Run OJAS Scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          LOG_LEVEL: info
+        run: npm start
+
+      # 6. Upload any leftover temp PDFs as artifacts for debugging
+      - name: 📁 Upload debug artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: temp-pdfs-debug
+          path: temp_pdfs/
+          retention-days: 3
+          if-no-files-found: ignore

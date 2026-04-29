@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+dist/
+
+# Environment variables (NEVER commit these)
+.env
+.env.local
+.env.*.local
+
+# Downloaded temp PDFs (transient, cleaned up automatically)
+temp_pdfs/
+*.pdf
+
+# Build artifacts
+*.js.map
+*.d.ts
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
