@@ -13,7 +13,7 @@ export interface OjasJobListing {
 }
 
 export class OjasScraper {
-  private url = 'https://ojas.gujarat.gov.in/AdvtList.aspx?type=lCxUjNjnTp8=';
+  private url = process.env.OJAS_URL || 'https://ojas.gujarat.gov.in/AdvtList.aspx?type=lCxUjNjnTp8=';
 
   async scrapeListings(): Promise<OjasJobListing[]> {
     const browser = await chromium.launch({ headless: true });
@@ -84,7 +84,7 @@ export class OjasScraper {
 
     } catch (error) {
       console.error('Error during OJAS scraping:', error);
-      return [];
+      throw error; // Rethrow to let index.ts handle notification
     } finally {
       await browser.close();
     }

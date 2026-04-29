@@ -5,6 +5,7 @@ import { checkJobExists, insertJob, addJobEvent, JobInsert } from './db/jobs';
 import path from 'path';
 import fs from 'fs-extra';
 import dotenv from 'dotenv';
+import { sendErrorEmail } from './utils/email';
 
 dotenv.config();
 
@@ -62,7 +63,7 @@ async function run() {
         department: dept,
         application_end: extraDetails.application_end || parseOjasDate(listing.endsOn),
         application_start: extraDetails.application_start,
-        apply_url: 'https://ojas.gujarat.gov.in/AdvtList.aspx?type=lCxUjNjnTp8=',
+        apply_url: process.env.OJAS_URL || 'https://ojas.gujarat.gov.in/AdvtList.aspx?type=lCxUjNjnTp8=',
         notification_pdf_url: notificationPdfUrl || listing.detailsUrl,
         vacancies: extraDetails.vacancies,
         age_min: extraDetails.age_min,
@@ -124,4 +125,8 @@ function parseOjasDate(dateStr: string): string {
   return `${year}-${month}-${day}T${timePart || '00:00:00'}`;
 }
 
-run().catch(console.error);
+run().catch(async (error) => {
+  console.error('Fatal error during execution:', error);
+  await sendErrorEmail(error);
+  process.exit(1);
+});

@@ -37,6 +37,9 @@ Set these in your GitHub repo → **Settings → Secrets → Actions**:
 | `SUPABASE_URL` | Your Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (not anon) |
 | `GEMINI_API_KEY` | Google Gemini API key |
+| `OJAS_URL` | (Optional) The OJAS department listing URL if it changes |
+| `EMAIL_USER` | Gmail address to send failure alerts from |
+| `EMAIL_PASS` | Gmail App Password (NOT your regular password) |
 
 ## Local Development
 
