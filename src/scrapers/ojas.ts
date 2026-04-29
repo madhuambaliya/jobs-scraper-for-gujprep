@@ -24,10 +24,11 @@ export class OjasScraper {
 
     try {
       console.log(`Navigating to ${this.url}...`);
-      await page.goto(this.url, { waitUntil: 'networkidle' });
-
+      await page.goto(this.url, { waitUntil: 'load', timeout: 60000 });
+      
+      // Wait for the dropdown specifically instead of waiting for the entire network to be idle
       const dropdownSelector = 'select#ddlDept';
-      await page.waitForSelector(dropdownSelector);
+      await page.waitForSelector(dropdownSelector, { timeout: 30000 });
 
       const deptValues = await page.evaluate((sel) => {
         const select = document.querySelector(sel) as HTMLSelectElement;
@@ -44,9 +45,11 @@ export class OjasScraper {
         console.log(`Checking department: ${deptValue}`);
         try {
           await Promise.all([
-            page.waitForNavigation({ waitUntil: 'networkidle', timeout: 10000 }),
+            page.waitForNavigation({ waitUntil: 'load', timeout: 20000 }),
             page.selectOption(dropdownSelector, deptValue)
           ]);
+          // Small delay to let the table render
+          await page.waitForTimeout(1000);
         } catch (e) {
           // If no response, table might not be there
         }
@@ -96,11 +99,11 @@ export class OjasScraper {
     const page = await context.newPage();
     
     try {
-      await page.goto(this.url, { waitUntil: 'networkidle' });
+      await page.goto(this.url, { waitUntil: 'load', timeout: 60000 });
       
       console.log(`Selecting department ${deptValue} before download...`);
       await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle', timeout: 10000 }),
+        page.waitForNavigation({ waitUntil: 'load', timeout: 20000 }),
         page.selectOption('select#ddlDept', deptValue)
       ]);
       
