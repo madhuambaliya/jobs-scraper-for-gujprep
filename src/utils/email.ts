@@ -9,6 +9,12 @@ export async function sendErrorEmail(error: any) {
   const pass = process.env.EMAIL_PASS;
   const recipient = 'madhuambaliya0@gmail.com';
 
+  // Only send emails if running in GitHub Actions (CI)
+  if (!process.env.GITHUB_ACTIONS) {
+    console.log('ℹ️ Local execution detected. Skipping error email notification.');
+    return;
+  }
+
   if (!user || !pass) {
     console.warn('⚠️ EMAIL_USER or EMAIL_PASS not set. Skipping error email notification.');
     return;
