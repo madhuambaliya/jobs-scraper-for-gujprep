@@ -34,7 +34,7 @@ async function run() {
 
       // 1. Download PDF
       const pdfFileName = `${listing.advtNo.replace(/\//g, '_')}.pdf`;
-      const pdfPath = path.join(__dirname, '../temp_pdfs', pdfFileName);
+      const pdfPath = path.join(process.cwd(), 'temp_pdfs', pdfFileName);
       await fs.ensureDir(path.dirname(pdfPath));
 
       const downloaded = await scraper.downloadPdf(listing.detailsUrl, listing.deptValue, pdfPath);

@@ -99,9 +99,13 @@ export class GeminiExtractor {
           return cleaned;
         } catch (err: any) {
           lastError = err;
-          if (err?.status === 503 || err?.status === 429) {
+          if (err?.status === 429) {
+            const delay = 30000 * attempt;
+            console.warn(`Gemini 429 (Rate Limit) – retrying in ${delay / 1000}s...`);
+            await new Promise((r) => setTimeout(r, delay));
+          } else if (err?.status === 503) {
             const delay = 5000 * attempt;
-            console.warn(`Gemini ${err.status} – retrying in ${delay / 1000}s...`);
+            console.warn(`Gemini 503 (Overloaded) – retrying in ${delay / 1000}s...`);
             await new Promise((r) => setTimeout(r, delay));
           } else {
             throw err;

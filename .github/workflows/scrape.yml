@@ -45,7 +45,15 @@ jobs:
       - name: 🎭 Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      # 5. Run the scraper
+      # 5. Build the project
+      - name: 🏗️ Build project
+        run: npm run build
+
+      # 6. Check IP (Debug)
+      - name: 🌐 Check Runner IP
+        run: curl -s https://ifconfig.me
+
+      # 7. Run the scraper
       - name: 🔍 Run OJAS Scraper
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -56,9 +64,9 @@ jobs:
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
           LOG_LEVEL: info
-        run: npm start
+        run: node dist/src/index.js
 
-      # 6. Upload any leftover temp PDFs as artifacts for debugging
+      # 8. Upload any leftover temp PDFs as artifacts for debugging
       - name: 📁 Upload debug artifacts (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
