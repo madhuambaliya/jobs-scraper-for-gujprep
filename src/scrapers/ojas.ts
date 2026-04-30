@@ -16,7 +16,10 @@ export class OjasScraper {
   private url = process.env.OJAS_URL || 'https://ojas.gujarat.gov.in/AdvtList.aspx?type=lCxUjNjnTp8=';
 
   async scrapeListings(): Promise<OjasJobListing[]> {
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({ 
+      headless: true,
+      args: ['--disable-blink-features=AutomationControlled', '--no-sandbox']
+    });
     const context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
     });
@@ -24,7 +27,23 @@ export class OjasScraper {
 
     try {
       console.log(`Navigating to ${this.url}...`);
-      await page.goto(this.url, { waitUntil: 'load', timeout: 60000 });
+      
+      // Retry logic for navigation to handle transient CI network issues or slow site response
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          await page.goto(this.url, { 
+            waitUntil: 'domcontentloaded', 
+            timeout: 90000 // 90 seconds
+          });
+          break; // Success
+        } catch (error) {
+          retries--;
+          console.warn(`Navigation failed. Retries remaining: ${retries}. Error: ${error instanceof Error ? error.message : error}`);
+          if (retries === 0) throw error;
+          await page.waitForTimeout(5000); // Wait 5s before retry
+        }
+      }
       
       // Wait for the dropdown specifically instead of waiting for the entire network to be idle
       const dropdownSelector = 'select#ddlDept';
@@ -45,7 +64,7 @@ export class OjasScraper {
         console.log(`Checking department: ${deptValue}`);
         try {
           await Promise.all([
-            page.waitForNavigation({ waitUntil: 'load', timeout: 20000 }),
+            page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 45000 }),
             page.selectOption(dropdownSelector, deptValue)
           ]);
           // Small delay to let the table render
@@ -94,16 +113,29 @@ export class OjasScraper {
   }
 
   async downloadPdf(buttonName: string, deptValue: string, outputPath: string): Promise<boolean> {
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({ 
+      headless: true,
+      args: ['--disable-blink-features=AutomationControlled', '--no-sandbox']
+    });
     const context = await browser.newContext();
     const page = await context.newPage();
     
     try {
-      await page.goto(this.url, { waitUntil: 'load', timeout: 60000 });
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          await page.goto(this.url, { waitUntil: 'domcontentloaded', timeout: 90000 });
+          break;
+        } catch (error) {
+          retries--;
+          if (retries === 0) throw error;
+          await page.waitForTimeout(5000);
+        }
+      }
       
       console.log(`Selecting department ${deptValue} before download...`);
       await Promise.all([
-        page.waitForNavigation({ waitUntil: 'load', timeout: 20000 }),
+        page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 45000 }),
         page.selectOption('select#ddlDept', deptValue)
       ]);
       
