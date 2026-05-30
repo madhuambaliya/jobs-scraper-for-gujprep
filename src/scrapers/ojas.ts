@@ -37,16 +37,17 @@ export class OjasScraper {
       console.log(`Navigating to ${this.url}...`);
       
       // Retry logic for navigation to handle transient CI network issues or slow site response
-      let retries = 3;
+      const maxAttempts = useAuto ? 15 : 3;
       let attempt = 0;
-      while (retries > 0) {
+      while (attempt < maxAttempts) {
         attempt++;
         let proxyServer = process.env.SCRAPER_PROXY;
         if (useAuto && autoProxies.length > 0) {
-          proxyServer = autoProxies[Math.floor(Math.random() * autoProxies.length)];
-          console.log(`[Attempt ${attempt}] Using auto proxy: ${proxyServer}`);
+          const index = Math.floor(Math.random() * autoProxies.length);
+          proxyServer = autoProxies.splice(index, 1)[0];
+          console.log(`[Attempt ${attempt}/${maxAttempts}] Using auto proxy: ${proxyServer} (Remaining proxies: ${autoProxies.length})`);
         } else if (proxyServer && proxyServer !== 'auto') {
-          console.log(`[Attempt ${attempt}] Using configured proxy: ${proxyServer}`);
+          console.log(`[Attempt ${attempt}/${maxAttempts}] Using configured proxy: ${proxyServer}`);
         }
 
         context = await browser.newContext({
@@ -60,17 +61,17 @@ export class OjasScraper {
         page = await context.newPage();
 
         try {
+          const timeout = proxyServer ? 25000 : 90000;
           await page.goto(this.url, { 
             waitUntil: 'domcontentloaded', 
-            timeout: 90000 // 90 seconds
+            timeout: timeout
           });
           break; // Success
         } catch (error) {
-          retries--;
-          console.warn(`Navigation failed. Retries remaining: ${retries}. Error: ${error instanceof Error ? error.message : error}`);
+          console.warn(`Navigation failed on attempt ${attempt}. Error: ${error instanceof Error ? error.message : error}`);
           await context.close();
-          if (retries === 0) throw error;
-          await delay(5000); // Wait 5s before retry
+          if (attempt >= maxAttempts) throw error;
+          await delay(3000); // Wait 3s before retry
         }
       }
       
@@ -157,16 +158,17 @@ export class OjasScraper {
     let page: any;
     
     try {
-      let retries = 3;
+      const maxAttempts = useAuto ? 15 : 3;
       let attempt = 0;
-      while (retries > 0) {
+      while (attempt < maxAttempts) {
         attempt++;
         let proxyServer = process.env.SCRAPER_PROXY;
         if (useAuto && autoProxies.length > 0) {
-          proxyServer = autoProxies[Math.floor(Math.random() * autoProxies.length)];
-          console.log(`[Download Attempt ${attempt}] Using auto proxy: ${proxyServer}`);
+          const index = Math.floor(Math.random() * autoProxies.length);
+          proxyServer = autoProxies.splice(index, 1)[0];
+          console.log(`[Download Attempt ${attempt}/${maxAttempts}] Using auto proxy: ${proxyServer} (Remaining proxies: ${autoProxies.length})`);
         } else if (proxyServer && proxyServer !== 'auto') {
-          console.log(`[Download Attempt ${attempt}] Using configured proxy: ${proxyServer}`);
+          console.log(`[Download Attempt ${attempt}/${maxAttempts}] Using configured proxy: ${proxyServer}`);
         }
 
         context = await browser.newContext({
@@ -179,13 +181,14 @@ export class OjasScraper {
         page = await context.newPage();
 
         try {
-          await page.goto(this.url, { waitUntil: 'domcontentloaded', timeout: 90000 });
+          const timeout = proxyServer ? 25000 : 90000;
+          await page.goto(this.url, { waitUntil: 'domcontentloaded', timeout: timeout });
           break;
         } catch (error) {
-          retries--;
+          console.warn(`Download navigation failed on attempt ${attempt}. Error: ${error instanceof Error ? error.message : error}`);
           await context.close();
-          if (retries === 0) throw error;
-          await delay(5000);
+          if (attempt >= maxAttempts) throw error;
+          await delay(3000);
         }
       }
       
