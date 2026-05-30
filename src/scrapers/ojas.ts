@@ -3,6 +3,8 @@ import axios from 'axios';
 const stealth = require('puppeteer-extra-plugin-stealth')();
 chromium.use(stealth);
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export interface OjasJobListing {
   advtNo: string;
   title: string;
@@ -68,7 +70,7 @@ export class OjasScraper {
           console.warn(`Navigation failed. Retries remaining: ${retries}. Error: ${error instanceof Error ? error.message : error}`);
           await context.close();
           if (retries === 0) throw error;
-          await page.waitForTimeout(5000); // Wait 5s before retry
+          await delay(5000); // Wait 5s before retry
         }
       }
       
@@ -95,7 +97,7 @@ export class OjasScraper {
             page.selectOption(dropdownSelector, deptValue)
           ]);
           // Small delay to let the table render
-          await page.waitForTimeout(1000);
+          await delay(1000);
         } catch (e) {
           // If no response, table might not be there
         }
@@ -183,7 +185,7 @@ export class OjasScraper {
           retries--;
           await context.close();
           if (retries === 0) throw error;
-          await page.waitForTimeout(5000);
+          await delay(5000);
         }
       }
       
