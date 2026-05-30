@@ -1,4 +1,5 @@
 import { chromium } from 'playwright-extra';
+import axios from 'axios';
 const stealth = require('puppeteer-extra-plugin-stealth')();
 chromium.use(stealth);
 
@@ -16,21 +17,46 @@ export class OjasScraper {
   private url = 'https://ojas.gujarat.gov.in/AdvtList.aspx?type=lCxUjNjnTp8=';
 
   async scrapeListings(): Promise<OjasJobListing[]> {
+    const useAuto = process.env.SCRAPER_PROXY === 'auto';
+    let autoProxies: string[] = [];
+    if (useAuto) {
+      autoProxies = await this.fetchFreeIndianProxies();
+    }
+
     const browser = await chromium.launch({ 
       headless: true,
       args: ['--disable-blink-features=AutomationControlled', '--no-sandbox']
     });
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-    });
-    const page = await context.newPage();
+
+    let context: any;
+    let page: any;
 
     try {
       console.log(`Navigating to ${this.url}...`);
       
       // Retry logic for navigation to handle transient CI network issues or slow site response
       let retries = 3;
+      let attempt = 0;
       while (retries > 0) {
+        attempt++;
+        let proxyServer = process.env.SCRAPER_PROXY;
+        if (useAuto && autoProxies.length > 0) {
+          proxyServer = autoProxies[Math.floor(Math.random() * autoProxies.length)];
+          console.log(`[Attempt ${attempt}] Using auto proxy: ${proxyServer}`);
+        } else if (proxyServer && proxyServer !== 'auto') {
+          console.log(`[Attempt ${attempt}] Using configured proxy: ${proxyServer}`);
+        }
+
+        context = await browser.newContext({
+          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+          proxy: proxyServer && proxyServer !== 'auto' ? {
+            server: proxyServer,
+            ...(process.env.SCRAPER_PROXY_USERNAME && { username: process.env.SCRAPER_PROXY_USERNAME }),
+            ...(process.env.SCRAPER_PROXY_PASSWORD && { password: process.env.SCRAPER_PROXY_PASSWORD }),
+          } : undefined
+        });
+        page = await context.newPage();
+
         try {
           await page.goto(this.url, { 
             waitUntil: 'domcontentloaded', 
@@ -40,6 +66,7 @@ export class OjasScraper {
         } catch (error) {
           retries--;
           console.warn(`Navigation failed. Retries remaining: ${retries}. Error: ${error instanceof Error ? error.message : error}`);
+          await context.close();
           if (retries === 0) throw error;
           await page.waitForTimeout(5000); // Wait 5s before retry
         }
@@ -49,7 +76,7 @@ export class OjasScraper {
       const dropdownSelector = 'select#ddlDept';
       await page.waitForSelector(dropdownSelector, { timeout: 30000 });
 
-      const deptValues = await page.evaluate((sel) => {
+      const deptValues = await page.evaluate((sel: string) => {
         const select = document.querySelector(sel) as HTMLSelectElement;
         return Array.from(select.options)
           .map(opt => opt.value)
@@ -113,21 +140,48 @@ export class OjasScraper {
   }
 
   async downloadPdf(buttonName: string, deptValue: string, outputPath: string): Promise<boolean> {
+    const useAuto = process.env.SCRAPER_PROXY === 'auto';
+    let autoProxies: string[] = [];
+    if (useAuto) {
+      autoProxies = await this.fetchFreeIndianProxies();
+    }
+
     const browser = await chromium.launch({ 
       headless: true,
       args: ['--disable-blink-features=AutomationControlled', '--no-sandbox']
     });
-    const context = await browser.newContext();
-    const page = await context.newPage();
+    
+    let context: any;
+    let page: any;
     
     try {
       let retries = 3;
+      let attempt = 0;
       while (retries > 0) {
+        attempt++;
+        let proxyServer = process.env.SCRAPER_PROXY;
+        if (useAuto && autoProxies.length > 0) {
+          proxyServer = autoProxies[Math.floor(Math.random() * autoProxies.length)];
+          console.log(`[Download Attempt ${attempt}] Using auto proxy: ${proxyServer}`);
+        } else if (proxyServer && proxyServer !== 'auto') {
+          console.log(`[Download Attempt ${attempt}] Using configured proxy: ${proxyServer}`);
+        }
+
+        context = await browser.newContext({
+          proxy: proxyServer && proxyServer !== 'auto' ? {
+            server: proxyServer,
+            ...(process.env.SCRAPER_PROXY_USERNAME && { username: process.env.SCRAPER_PROXY_USERNAME }),
+            ...(process.env.SCRAPER_PROXY_PASSWORD && { password: process.env.SCRAPER_PROXY_PASSWORD }),
+          } : undefined
+        });
+        page = await context.newPage();
+
         try {
           await page.goto(this.url, { waitUntil: 'domcontentloaded', timeout: 90000 });
           break;
         } catch (error) {
           retries--;
+          await context.close();
           if (retries === 0) throw error;
           await page.waitForTimeout(5000);
         }
@@ -155,6 +209,22 @@ export class OjasScraper {
       return false;
     } finally {
       await browser.close();
+    }
+  }
+
+  private async fetchFreeIndianProxies(): Promise<string[]> {
+    try {
+      console.log('Fetching free Indian proxies from ProxyScrape...');
+      const response = await axios.get('https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text&country=in', { timeout: 10000 });
+      const list = response.data
+        .split('\n')
+        .map((p: string) => p.trim())
+        .filter((p: string) => p.length > 0 && (p.startsWith('http://') || p.startsWith('socks4://') || p.startsWith('socks5://')));
+      console.log(`Fetched ${list.length} free Indian proxies.`);
+      return list;
+    } catch (error) {
+      console.warn('Failed to fetch free proxies:', error instanceof Error ? error.message : error);
+      return [];
     }
   }
 }
